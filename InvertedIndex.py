@@ -26,6 +26,16 @@ class Doc:
         return '(' + str(self.id) + ', ' + str(self.docNo) + ')'
 
 
+class Node:
+    def __init__(self, left=None, data=None, right=None):
+        self.left = left
+        self.right = right
+        self.data = data
+
+    def __repr__(self):
+        return '(' + str(self.left) + '<----- ('+str(self.data)+') ---->' + str(self.right) + ')'
+
+
 def tokenize(text):
     text = text.replace('\n', ' ')
     lines = text.split(' ')
@@ -150,9 +160,23 @@ def NOT(left, right):
     return result
 
 
-left = [Doc(1, ""), Doc(4, ""), Doc(5, "")]
-right = [Doc(0, ""), Doc(1, ""), Doc(2, ""), Doc(4, ""), Doc(7, "")]
+def parseQuery(query):
+    print(query)
+    if len(query) == 3:
+        return Node(query[0], query[1], query[2])
+    first, last = 0, len(query) - 1
+    if query[first] == '(' and query[last] == ')':
+        return parseQuery(query[first + 1:last])
+    elif query[first] == '(':
+        return parseQuery(query[first + 1:])
+    elif query[last] == ')':
+        return parseQuery(query[:last])
+    else:
+        left = query[first]
+        op = query[first + 1]
+        node = parseQuery(query[first + 2:])
+        return Node(left, op, node)
 
-print(AND(left, right))
-print(OR(left, right))
-print(NOT(left, right))
+
+query = "( hubble AND ( telescope NOT space ) )"
+print(parseQuery(query.split(' ')))
