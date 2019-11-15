@@ -1,4 +1,6 @@
 import os
+
+import boolean
 from lxml import etree
 
 
@@ -32,8 +34,14 @@ class Node:
         self.right = right
         self.data = data
 
+    def isFullNode(self):
+        return self.data and self.left and self.right
+
+    def isCleanNode(self):
+        return not (self.data or self.left or self.right)
+
     def __repr__(self):
-        return '(' + str(self.left) + '<----- ('+str(self.data)+') ---->' + str(self.right) + ')'
+        return '(' + str(self.left) + '<----- (' + str(self.data) + ') ---->' + str(self.right) + ')'
 
 
 def tokenize(text):
@@ -160,23 +168,93 @@ def NOT(left, right):
     return result
 
 
-def parseQuery(query):
-    print(query)
-    if len(query) == 3:
-        return Node(query[0], query[1], query[2])
-    first, last = 0, len(query) - 1
-    if query[first] == '(' and query[last] == ')':
-        return parseQuery(query[first + 1:last])
-    elif query[first] == '(':
-        return parseQuery(query[first + 1:])
-    elif query[last] == ')':
-        return parseQuery(query[:last])
+def executeQuery(queryTree, invertedIndex):
+    if not queryTree:
+        return []
+    op = None
+    if queryTree.data == 'AND':
+        op = AND
+    elif queryTree.data == 'OR':
+        op = OR
+    elif queryTree.data == 'NOT':
+        op = NOT
+
+    if op:
+        return op(executeQuery(queryTree.left, invertedIndex), executeQuery(queryTree.right, invertedIndex))
     else:
-        left = query[first]
-        op = query[first + 1]
-        node = parseQuery(query[first + 2:])
-        return Node(left, op, node)
+        return invertedIndex[queryTree.data]
 
 
-query = "( hubble AND ( telescope NOT space ) )"
-print(parseQuery(query.split(' ')))
+def BooleanQueries(invertedIndex):
+    with open("BooleanQueries.txt", 'r') as f:  # Reading file
+        for query in f:
+            query = '( ( iran OR africa ) NOT ( sanctions OR support ) )'
+            queryTree = parseQuery(query.strip())
+            print(query)
+            print(queryTree)
+            break
+            # print(executeQuery(queryTree, invertedIndex))
+
+
+def isDataNode(node):
+    return (node.data not in ['AND', 'OR', 'NOT']) and not node.left and not node.right
+
+
+def parser(query):
+    if len(query) == 0:
+        return None
+    if query[0] == '(':
+        node = parser(query[1:])  # always move forward
+        return node # do nothing when return
+    elif query[0] in ['AND', 'OR', 'NOT']:
+        node = parser(query[1:])  # always move forward
+        # returned with valid node so we need to fill operator
+        if node.isFullNode():
+            # if it is a full node; has data and left and right not null
+            # then we should check the left side if it is full or data node only (some sort of full)
+            # then create new node nesting the returned one in the right and set the operation
+            if node.left.isFullNode() or isDataNode(node.left):
+                node = Node(data=query[0], right=node)
+            else:
+                # the left is not full node and not data node
+                # so it has to be in ((None <--- (None) ---> None) < --- (Operator) --- > ( Something ) ) structure
+                node.left.data = query[0]
+        else:
+            # node is not full so lets set the op example :(None) < --- (None)  --- > ( Something )
+            node.data = query[0]
+        return node
+    elif query[0] == ')':
+        if len(query) == 1:  # last ) so we create new node
+            return Node()
+        else:
+            node = parser(query[1:])  # always move forward
+
+            # on the recursion back if we face ) then it should be a new node unless its full
+            if not node.left and node.right and node.data:
+                node.left = Node()
+            return node
+    else:
+        node = parser(query[1:])  # always move forward
+        mainNode = node
+        #  when returned node is valid has not full left branch then deal the left side
+        if node.left and not node.left.isFullNode():
+            node = node.left
+
+        # fill what is needed
+        if (not node.right and not node.left) or node.left:
+            node.right = Node(data=query[0])
+        elif node.right:
+            node.left = Node(data=query[0])
+        return mainNode
+
+
+# query = '( ( a AND ( x AND y ) ) AND ( d NOT c ) )'
+# query = '( a AND b )'
+# query = '( a AND ( b AND c ) )'
+query = '( ( a AND b ) AND c )'
+split = query.strip().split(' ')
+print(split)
+print(parser(split))
+# print(parseQuery(split, 0))
+# print(query.rindex('('))
+# BooleanQueries({'hubble': [1, 3, 7], 'telescope': [2, 3, 5], 'space': [2, 4, 8], })
