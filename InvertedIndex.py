@@ -1,7 +1,8 @@
 import os
 
-import boolean
-from lxml import etree
+from FunnyParser import FunnyDocsParser
+
+parser = FunnyDocsParser()
 
 
 class Doc:
@@ -61,32 +62,25 @@ def indexTokens(doc, tokenizedText, invertedIndex):
 
 def indexTexts(doc, texts, invertedIndex):
     for t in texts:
-        tokenizedText = tokenize(t.text.strip())
+        tokenizedText = tokenize(t.content.strip())
         indexTokens(doc, tokenizedText, invertedIndex)
 
 
 def indexFile(filePath, invertedIndex, globalID):
-    with open(filePath, 'r') as f:  # Reading file
-        xml = f.read()
-    xml = '<ROOT>' + xml + '</ROOT>'
-    parser = etree.XMLParser(recover=True)
-    root = etree.fromstring(xml, parser=parser)
-    for doc in root:
-        try:
-            docNo = doc.find("DOCNO").text.strip()
-            texts = doc.findall("TEXT")
-            if len(texts) > 0:
-                globalID += 1
-                doc = Doc(globalID, docNo)
-                indexTexts(doc, texts, invertedIndex)
-            # print(tokenizedText)
-        except:
-            print('errorrrrrr ', etree.tostring(doc))
+    result = parser.parse(filePath)
+    print(str(result))
+    for doc in result.docs:
+        docNo = doc.docNo
+        texts = doc.texts
+        if len(texts) > 0:
+            globalID += 1
+            doc = Doc(globalID, docNo)
+            indexTexts(doc, texts, invertedIndex)
     return globalID
 
 
 def loadFiles():
-    directoryPath = "./AP_Coll_Parsed"
+    directoryPath = "./stam"
     files = []
     for r, d, f in os.walk(directoryPath):
         for file in f:
@@ -106,6 +100,7 @@ def InvertedIndex():
             print(file)
         else:
             break
+    return invertedIndex
 
 
 def AND(left, right):
@@ -189,7 +184,7 @@ def BooleanQueries(invertedIndex):
     with open("BooleanQueries.txt", 'r') as f:  # Reading file
         for query in f:
             query = '( ( iran OR africa ) NOT ( sanctions OR support ) )'
-            queryTree = parseQuery(query.strip())
+            queryTree = parseQuery(query.strip().split(' '))
             print(query)
             print(queryTree)
             break
@@ -200,14 +195,14 @@ def isDataNode(node):
     return (node.data not in ['AND', 'OR', 'NOT']) and not node.left and not node.right
 
 
-def parser(query):
+def parseQuery(query):
     if len(query) == 0:
         return None
     if query[0] == '(':
-        node = parser(query[1:])  # always move forward
-        return node # do nothing when return
+        node = parseQuery(query[1:])  # always move forward
+        return node  # do nothing when return
     elif query[0] in ['AND', 'OR', 'NOT']:
-        node = parser(query[1:])  # always move forward
+        node = parseQuery(query[1:])  # always move forward
         # returned with valid node so we need to fill operator
         if node.isFullNode():
             # if it is a full node; has data and left and right not null
@@ -227,14 +222,14 @@ def parser(query):
         if len(query) == 1:  # last ) so we create new node
             return Node()
         else:
-            node = parser(query[1:])  # always move forward
+            node = parseQuery(query[1:])  # always move forward
 
             # on the recursion back if we face ) then it should be a new node unless its full
             if not node.left and node.right and node.data:
                 node.left = Node()
             return node
     else:
-        node = parser(query[1:])  # always move forward
+        node = parseQuery(query[1:])  # always move forward
         mainNode = node
         #  when returned node is valid has not full left branch then deal the left side
         if node.left and not node.left.isFullNode():
@@ -248,13 +243,5 @@ def parser(query):
         return mainNode
 
 
-# query = '( ( a AND ( x AND y ) ) AND ( d NOT c ) )'
-# query = '( a AND b )'
-# query = '( a AND ( b AND c ) )'
-query = '( ( a AND b ) AND c )'
-split = query.strip().split(' ')
-print(split)
-print(parser(split))
-# print(parseQuery(split, 0))
-# print(query.rindex('('))
-# BooleanQueries({'hubble': [1, 3, 7], 'telescope': [2, 3, 5], 'space': [2, 4, 8], })
+invertedIndex = InvertedIndex()
+print(invertedIndex)
