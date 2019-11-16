@@ -2,6 +2,18 @@ import os
 
 from FunnyParser import FunnyDocsParser
 
+import sys
+
+
+def progress(end_val, bar_length=100):
+    for i in xrange(0, end_val):
+        percent = float(i) / end_val
+        hashes = '#' * int(round(percent * bar_length))
+        spaces = ' ' * (bar_length - len(hashes))
+        sys.stdout.write("\r Files indexed: [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
+        sys.stdout.flush()
+
+
 parser = FunnyDocsParser()
 
 
@@ -68,7 +80,6 @@ def indexTexts(doc, texts, invertedIndex):
 
 def indexFile(filePath, invertedIndex, globalID):
     result = parser.parse(filePath)
-    print(str(result))
     for doc in result.docs:
         docNo = doc.docNo
         texts = doc.texts
@@ -76,11 +87,12 @@ def indexFile(filePath, invertedIndex, globalID):
             globalID += 1
             doc = Doc(globalID, docNo)
             indexTexts(doc, texts, invertedIndex)
+    parser.clean()
     return globalID
 
 
 def loadFiles():
-    directoryPath = "./stam"
+    directoryPath = "./AP_Coll_Parsed"
     files = []
     for r, d, f in os.walk(directoryPath):
         for file in f:
@@ -91,15 +103,14 @@ def loadFiles():
 def InvertedIndex():
     invertedIndex = dict()
     files = loadFiles()
-    limit = 2000
+    count = 0
+    totalFiles = len(files)
     globalId = 0
     for file in files:
-        if limit > 0:
-            limit -= 1
-            globalId = indexFile(file, invertedIndex, globalId)
-            print(file)
-        else:
-            break
+        globalId = indexFile(file, invertedIndex, globalId)
+        count += 1
+        # print(file)
+        progress(int(100 * (float(count) / float(totalFiles))))
     return invertedIndex
 
 
@@ -166,6 +177,7 @@ def NOT(left, right):
 def executeQuery(queryTree, invertedIndex):
     if not queryTree:
         return []
+
     op = None
     if queryTree.data == 'AND':
         op = AND
@@ -177,18 +189,25 @@ def executeQuery(queryTree, invertedIndex):
     if op:
         return op(executeQuery(queryTree.left, invertedIndex), executeQuery(queryTree.right, invertedIndex))
     else:
-        return invertedIndex[queryTree.data]
+        if queryTree.data in invertedIndex:
+            return invertedIndex[queryTree.data]
+        else:
+            return []
 
 
 def BooleanQueries(invertedIndex):
-    with open("BooleanQueries.txt", 'r') as f:  # Reading file
-        for query in f:
-            query = '( ( iran OR africa ) NOT ( sanctions OR support ) )'
-            queryTree = parseQuery(query.strip().split(' '))
-            print(query)
-            print(queryTree)
-            break
-            # print(executeQuery(queryTree, invertedIndex))
+    with open('Part_2.txt', 'w') as output:
+        print('Executing Queries see Part_2.txt for the results...\n')
+        with open("BooleanQueries.txt", 'r') as f:  # Reading file
+            for query in f:
+                queryTree = parseQuery(query.strip().split(' '))
+                # print(query)
+                # print(queryTree)
+                execute_query = executeQuery(queryTree, invertedIndex)
+                strRes = ', '.join(map(lambda result: result.docNo, execute_query)) + '\n'
+                # print(strRes)
+                output.write(strRes)
+        print('Finished queries\n')
 
 
 def isDataNode(node):
@@ -243,5 +262,31 @@ def parseQuery(query):
         return mainNode
 
 
+def maxKFreqTerms(invertedIndex, k):
+    sorted_by_value = sorted(invertedIndex.items(), key=lambda kv: (len(kv[1]), kv[0]), reverse=True)
+    topK = sorted_by_value[0:k]
+    return topK
+
+
+def minKFreqTerms(invertedIndex, k):
+    sorted_by_value = sorted(invertedIndex.items(), key=lambda kv: (len(kv[1]), kv[0]))
+    topK = sorted_by_value[:k]
+    return topK
+
+
+def part3Stats(invertedIndex):
+    print('\n Writing stats.....\n')
+    with open('Part_3.txt', 'w') as part3:
+        part3.write("10 highest term freqs:\n")
+        for key, _ in maxKFreqTerms(invertedIndex, 10):
+            part3.write(str(key) + '\n')
+        part3.write("10 lowest term freqs:\n")
+        for key, _ in minKFreqTerms(invertedIndex, 10):
+            part3.write(str(key) + '\n')
+
+
 invertedIndex = InvertedIndex()
-print(invertedIndex)
+print('\n')
+BooleanQueries(invertedIndex)
+print('\n' + str(parser) + '\n')
+part3Stats(invertedIndex)

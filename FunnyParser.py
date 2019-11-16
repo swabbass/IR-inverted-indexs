@@ -33,12 +33,14 @@ class DocElement:
 
 class FunnyDocsParser:
     def __init__(self):
+        self.docsCount = 0
         self.docs = []
         self.lastValidElement = None
         self.currentElement = None
         self.failedDocs = []
 
     def clean(self):
+        self.docsCount += len(self.docs)
         self.docs = []
         self.currentElement = None
 
@@ -98,6 +100,6 @@ class FunnyDocsParser:
         return True  # all ok keep on reading
 
     def __repr__(self):
-        return 'total valid docs count: ' + str(len(self.docs)) + ', failedDocs count: ' + str(len(self.failedDocs))
+        return 'total valid docs count: ' + str(self.docsCount) + ', failedDocs count: ' + str(len(self.failedDocs))
 
 # print(FunnyDocsParser().parse('./stam/test'))

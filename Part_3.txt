@@ -1,0 +1,22 @@
+10 highest term freqs:
+the
+of
+in
+a
+and
+to
+for
+said
+on
+that
+10 lowest term freqs:
+00000
+0000015
+0000033
+0000057
+0000066
+000008
+00001
+000010
+000012
+000021
